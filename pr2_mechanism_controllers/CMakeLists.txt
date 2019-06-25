@@ -50,6 +50,7 @@ add_library( pr2_mechanism_controllers
   src/pr2_odometry.cpp
   src/pr2_base_controller.cpp
   src/pr2_base_controller2.cpp
+  src/pr2_base_controller3.cpp
   src/pr2_gripper_controller.cpp
   src/trajectory.cpp
   )
