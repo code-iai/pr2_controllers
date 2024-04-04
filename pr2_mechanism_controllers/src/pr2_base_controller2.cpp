@@ -155,6 +155,8 @@ bool Pr2BaseController2::init(pr2_mechanism_model::RobotState *robot, ros::NodeH
       ROS_ERROR("Could not initialize pid for %s",base_kinematics_.wheel_[j].joint_name_.c_str());
       return false;
     }
+    //ROS_ERROR("pid gains for %s", base_kinematics_.wheel_[j].joint_name_.c_str());
+    //wheel_pid_controllers_[j].printValues();
     /*    wheel_controller_[j].reset(new JointVelocityController());
    if(!wheel_controller_[j]->init(base_kinematics_.robot_state_, base_kinematics_.wheel_[j].joint_name_, p_i_d))
    {
@@ -452,6 +454,7 @@ void Pr2BaseController2::computeDesiredWheelSpeeds(const double &dT)
   wheel_vel_filter_.update(filtered_wheel_velocity_,filtered_wheel_velocity_);
 
   double steer_angle_actual = 0;
+//  ROS_ERROR("--------------------------------");
   for(int i = 0; i < (int) base_kinematics_.num_wheels_; i++)
   {
     base_kinematics_.wheel_[i].updatePosition();
@@ -468,10 +471,15 @@ void Pr2BaseController2::computeDesiredWheelSpeeds(const double &dT)
     wheel_point_velocity_projected.linear.y = sinth * wheel_point_velocity.linear.x + costh * wheel_point_velocity.linear.y;
     base_kinematics_.wheel_[i].wheel_speed_cmd_ = (wheel_point_velocity_projected.linear.x) / (base_kinematics_.wheel_[i].wheel_radius_);
     double command = wheel_pid_controllers_[i].computeCommand(
-          - wheel_caster_steer_component.linear.x/base_kinematics_.wheel_[i].wheel_radius_,
+//          - wheel_caster_steer_component.linear.x/base_kinematics_.wheel_[i].wheel_radius_,
           base_kinematics_.wheel_[i].wheel_speed_cmd_ - filtered_wheel_velocity_[i],
           ros::Duration(dT));
     base_kinematics_.wheel_[i].joint_->commanded_effort_ = command;
+    //if (i == 0)
+    //{
+      //ROS_INFO("%.5f", command);
+      //wheel_pid_controllers_[i].printValues();
+    //}
   }
 }
 
@@ -497,5 +505,6 @@ void Pr2BaseController2::commandCallback(const geometry_msgs::TwistConstPtr& msg
   base_vel_msg_ = *msg;
   this->setCommand(base_vel_msg_);
   pthread_mutex_unlock(&pr2_base_controller_lock_);
+  wheel_pid_controllers_[0].printValues();
 }
 } // namespace
