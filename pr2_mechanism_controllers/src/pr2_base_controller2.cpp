@@ -98,6 +98,10 @@ bool Pr2BaseController2::init(pr2_mechanism_model::RobotState *robot, ros::NodeH
   node_.param<double> ("kp_caster_steer", kp_caster_steer_, 80.0);
   node_.param<double> ("timeout", timeout_, 1.0);
   node_.param<double> ("state_publish_rate", state_publish_rate_,2.0);
+
+  node_.param<double> ("feedforward_trans", feedforward_trans, 0.0);
+  node_.param<double> ("feedforward_rot", feedforward_rot, 0.0);
+
   if(state_publish_rate_ <= 0.0)
   {
     publish_state_ = false;
@@ -190,9 +194,11 @@ bool Pr2BaseController2::init(pr2_mechanism_model::RobotState *robot, ros::NodeH
 void Pr2BaseController2::setCommand(const geometry_msgs::Twist &cmd_vel)
 {
   double vel_mag = sqrt(cmd_vel.linear.x * cmd_vel.linear.x + cmd_vel.linear.y * cmd_vel.linear.y);
-  double clamped_vel_mag = filters::clamp(vel_mag,-max_translational_velocity_, max_translational_velocity_);
+  double clamped_vel_mag = 0;
   if(vel_mag > EPS)
   {
+    double vel_mag_feedforward = vel_mag + feedforward_trans;
+    clamped_vel_mag = filters::clamp(vel_mag_feedforward,-max_translational_velocity_, max_translational_velocity_);
     cmd_vel_t_.linear.x = cmd_vel.linear.x * clamped_vel_mag / vel_mag;
     cmd_vel_t_.linear.y = cmd_vel.linear.y * clamped_vel_mag / vel_mag;
   }
@@ -201,7 +207,17 @@ void Pr2BaseController2::setCommand(const geometry_msgs::Twist &cmd_vel)
     cmd_vel_t_.linear.x = 0.0;
     cmd_vel_t_.linear.y = 0.0;
   }
-  cmd_vel_t_.angular.z = filters::clamp(cmd_vel.angular.z, -max_rotational_velocity_, max_rotational_velocity_);
+  double rot_feedforward = 0;
+  if (abs(cmd_vel.angular.z) > EPS)
+  {
+    if (cmd_vel.angular.z > 0)
+    {
+      rot_feedforward = cmd_vel.angular.z + feedforward_rot;
+    } else {
+      rot_feedforward = cmd_vel.angular.z - feedforward_rot;
+    }
+  }
+  cmd_vel_t_.angular.z = filters::clamp(rot_feedforward, -max_rotational_velocity_, max_rotational_velocity_);
   cmd_received_timestamp_ = base_kinematics_.robot_state_->getTime();
 
   ROS_DEBUG("BaseController:: command received: %f %f %f",cmd_vel.linear.x,cmd_vel.linear.y,cmd_vel.angular.z);
@@ -308,7 +324,9 @@ void Pr2BaseController2::update()
     cmd_vel_.angular.z = 0;
   }
   else
+  {
     cmd_vel_ = interpolateCommand(cmd_vel_, desired_vel_, max_accel_, dT);
+  }
 
   computeJointCommands(dT);
 
@@ -470,16 +488,13 @@ void Pr2BaseController2::computeDesiredWheelSpeeds(const double &dT)
     wheel_point_velocity_projected.linear.x = costh * wheel_point_velocity.linear.x - sinth * wheel_point_velocity.linear.y;
     wheel_point_velocity_projected.linear.y = sinth * wheel_point_velocity.linear.x + costh * wheel_point_velocity.linear.y;
     base_kinematics_.wheel_[i].wheel_speed_cmd_ = (wheel_point_velocity_projected.linear.x) / (base_kinematics_.wheel_[i].wheel_radius_);
+    double steer_vel = - wheel_caster_steer_component.linear.x/base_kinematics_.wheel_[i].wheel_radius_; 
+    double forward_vel = base_kinematics_.wheel_[i].wheel_speed_cmd_ - filtered_wheel_velocity_[i];
     double command = wheel_pid_controllers_[i].computeCommand(
-//          - wheel_caster_steer_component.linear.x/base_kinematics_.wheel_[i].wheel_radius_,
-          base_kinematics_.wheel_[i].wheel_speed_cmd_ - filtered_wheel_velocity_[i],
+          steer_vel,
+          forward_vel,
           ros::Duration(dT));
     base_kinematics_.wheel_[i].joint_->commanded_effort_ = command;
-    //if (i == 0)
-    //{
-      //ROS_INFO("%.5f", command);
-      //wheel_pid_controllers_[i].printValues();
-    //}
   }
 }
 
@@ -505,6 +520,5 @@ void Pr2BaseController2::commandCallback(const geometry_msgs::TwistConstPtr& msg
   base_vel_msg_ = *msg;
   this->setCommand(base_vel_msg_);
   pthread_mutex_unlock(&pr2_base_controller_lock_);
-  wheel_pid_controllers_[0].printValues();
 }
 } // namespace
