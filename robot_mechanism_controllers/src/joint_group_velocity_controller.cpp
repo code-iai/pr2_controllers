@@ -175,6 +175,7 @@ void JointGroupVelocityController::update()
       {
         pr2_controllers_msgs::JointControllerState singlejointcontrollerstate;
         singlejointcontrollerstate.header.stamp = time;
+	singlejointcontrollerstate.header.frame_id = joints_[i]->joint_->name;
         singlejointcontrollerstate.set_point = commands[i];
         singlejointcontrollerstate.process_value = joints_[i]->velocity_;
         singlejointcontrollerstate.error = compute_error[i];
@@ -188,7 +189,7 @@ void JointGroupVelocityController::update()
                  singlejointcontrollerstate.d,
                  singlejointcontrollerstate.i_clamp,
                  dummy);
-        controller_state_publisher_->msg_.controllestate.push_back(singlejointcontrollerstate);
+        controller_state_publisher_->msg_.controllestate[i] = singlejointcontrollerstate;
     }
     controller_state_publisher_->unlockAndPublish();
   }
