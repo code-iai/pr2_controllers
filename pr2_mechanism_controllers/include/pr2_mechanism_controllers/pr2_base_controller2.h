@@ -129,6 +129,12 @@ namespace controller
        */
       double timeout_;
 
+      /*
+       * \brief feedforward x/y/rot
+       */
+      double feedforward_trans;
+      double feedforward_rot;
+
       /*!
        * \brief true when new command received by node
        */
