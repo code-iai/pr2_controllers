@@ -154,7 +154,7 @@ void JointGroupVelocityController::update()
 {
   assert(robot_ != NULL);
   ros::Time time = robot_->getTime();
-  ros::Duration dt_ = time - last_time_;
+  ros::Duration dt_(std::min((time - last_time_).toSec(), 0.002));
   std::vector<double> & commands = *commands_buffer_.readFromRT();
   std::vector<double> compute_command(n_joints_);
   std::vector<double> compute_error(n_joints_);
